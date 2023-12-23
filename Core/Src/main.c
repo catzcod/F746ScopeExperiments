@@ -115,6 +115,7 @@ UART_HandleTypeDef huart3;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
+DMA_HandleTypeDef hdma_memtomem_dma2_stream1;
 /* USER CODE BEGIN PV */
 uint32_t GLOBAL_VAR_32BIT = 0;
 // ADCx conversion results
@@ -146,10 +147,10 @@ char DPY_par9[24];
 uint32_t CycleCount = 0;
 GPIO_PinState PS3 = GPIO_PIN_RESET;
 
-uint16_t adcBuf[BUFFER_LEN];             // this is where we'll store waveform data from ADC
+//uint16_t adcBuf[BUFFER_LEN];             // this is where we'll store waveform data from ADC
 uint16_t dpyBuf[BUFFER_LEN];             // this is where we'll store waveform data for display
 uint16_t dpyBuf_prev[BUFFER_LEN];             // this is where we'll store previous waveform data for display
-volatile uint8_t finishedConversion = 0; // this lets us know when we're done capturing data
+//volatile uint8_t finishedConversion = 0; // this lets us know when we're done capturing data
 volatile uint32_t ADC_ConvCpltCallback_TimeStamp = 0;
 volatile uint32_t ADC_ConvCycleTime = 0;
 volatile uint32_t DPY_DisplayFBTime = 0;
@@ -256,35 +257,36 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-	HAL_Delay(1000);
+  scopeInit();
+	HAL_Delay(3000);
 	{
 		uint8_t tx[] = "-----------------------------------------\r\n";
 		HAL_UART_Transmit(&huart3, tx, sizeof(tx), 100);
 	}
 
-	ST7789_Init();
-	HAL_GPIO_WritePin(DPY_BLK_GPIO_Port, DPY_BLK_Pin, GPIO_PIN_SET);
+
 /*
 	// Start timer TIM3 for framebuffer display
 	if (HAL_TIM_Base_Start_IT(&htim3) != HAL_OK)
 		Error_Handler();
-*/
+*/ /*
 	// Start timer TIM5 for microseconds counting
 	if (HAL_TIM_Base_Start_IT(&htim5) != HAL_OK)
 		Error_Handler();
-
+*/ /*
 	// start timer TIM4 for pwm generation
 	if (HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1) != HAL_OK)
 		Error_Handler();
 
 	memset(adcBuf, 0, sizeof(adcBuf));
+	*/
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
 	ST7789_Fill_Color_BUF(DARKBLUE);
-
+/*
 	{
 		uint8_t tx[] = "HAL_ADC_Start_DMA() started...\r\n";
 		HAL_UART_Transmit(&huart3, tx, sizeof(tx), 100);
@@ -300,20 +302,21 @@ int main(void)
 		uint8_t tx[] = "HAL_ADC_Start_DMA() conversion done.\r\n";
 		HAL_UART_Transmit(&huart3, tx, sizeof(tx), 100);
 	}
-
+*/
 	while (1)
 	{
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+		/*
 		uint32_t timer_start = htim5.Instance->CNT;
 		MAIN_CYCLE_TIME = htim5.Instance->CNT - MAIN_START_TIME;
 		MAIN_START_TIME = timer_start;
 
 		uint32_t timer_s1 = htim5.Instance->CNT;
 		dpyBufLocked = 1;
-		DrawScope(dpyBuf_prev, BUFFER_LEN, BLACK);
-		DrawScope(dpyBuf, BUFFER_LEN, WHITE);
+		//DrawScope(dpyBuf_prev, BUFFER_LEN, BLACK);
+		//DrawScope(dpyBuf, BUFFER_LEN, WHITE);
 		memcpy(dpyBuf_prev, dpyBuf, sizeof(dpyBuf_prev));
 		dpyBufLocked = 0;
 		uint32_t timer_s2 = htim5.Instance->CNT;
@@ -338,6 +341,8 @@ int main(void)
 		DPY_DisplayFBTime = (finish - start) / TIM5_MHZ;
 
 		HAL_Delay(250);
+		*/
+		scopeLoop();
 	}
   /* USER CODE END 3 */
 }
@@ -415,13 +420,13 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
-  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
   hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T4_TRGO;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = ENABLE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -629,33 +634,30 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 0 */
 
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM4_Init 1 */
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 10000;
+  htim4.Init.Prescaler = 0;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 7200;
+  htim4.Init.Period = 65535;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK)
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -782,12 +784,33 @@ static void MX_USB_OTG_FS_PCD_Init(void)
 
 /**
   * Enable DMA controller clock
+  * Configure DMA for memory to memory transfers
+  *   hdma_memtomem_dma2_stream1
   */
 static void MX_DMA_Init(void)
 {
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* Configure DMA request hdma_memtomem_dma2_stream1 on DMA2_Stream1 */
+  hdma_memtomem_dma2_stream1.Instance = DMA2_Stream1;
+  hdma_memtomem_dma2_stream1.Init.Channel = DMA_CHANNEL_0;
+  hdma_memtomem_dma2_stream1.Init.Direction = DMA_MEMORY_TO_MEMORY;
+  hdma_memtomem_dma2_stream1.Init.PeriphInc = DMA_PINC_ENABLE;
+  hdma_memtomem_dma2_stream1.Init.MemInc = DMA_MINC_ENABLE;
+  hdma_memtomem_dma2_stream1.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+  hdma_memtomem_dma2_stream1.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+  hdma_memtomem_dma2_stream1.Init.Mode = DMA_NORMAL;
+  hdma_memtomem_dma2_stream1.Init.Priority = DMA_PRIORITY_LOW;
+  hdma_memtomem_dma2_stream1.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
+  hdma_memtomem_dma2_stream1.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
+  hdma_memtomem_dma2_stream1.Init.MemBurst = DMA_MBURST_SINGLE;
+  hdma_memtomem_dma2_stream1.Init.PeriphBurst = DMA_PBURST_SINGLE;
+  if (HAL_DMA_Init(&hdma_memtomem_dma2_stream1) != HAL_OK)
+  {
+    Error_Handler( );
+  }
 
   /* DMA interrupt init */
   /* DMA2_Stream0_IRQn interrupt configuration */
@@ -875,6 +898,39 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+int __io_putchar(int ch)
+{
+  writeChar(ch);
+  return ch;
+}
+
+void printFloat(float v, int decimalDigits, char s[])
+{
+  uint8_t neg = 0;
+  if (v < 0)
+  {
+    neg = 1;
+    v = v - (2.0 * v);
+  }
+  int i = 1;
+  int intPart, fractPart;
+  for (; decimalDigits != 0; i *= 10, decimalDigits--)
+    ;
+  intPart = (int)v;
+  fractPart = (int)((v - (float)(int)v) * i);
+  if (fractPart < 0)
+    fractPart *= -1;
+  if (neg)
+    sprintf(s, "-%i.%i", intPart, fractPart);
+  else
+    sprintf(s, "%i.%i", intPart, fractPart);
+}
+
+void *dma_memcpy(void *destination, const void *source, size_t num){
+  HAL_DMA_Start_IT(&hdma_memtomem_dma2_stream1, source, destination, num);
+  while(HAL_DMA_GetState(&hdma_memtomem_dma2_stream1) != HAL_DMA_STATE_READY);
+}
+
 // Callback from roll over timers
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
@@ -886,8 +942,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			uint32_t finish = htim5.Instance->CNT;
 			DPY_DisplayFBTime = (finish - start) / TIM5_MHZ;
 		}
-
-		HAL_GPIO_TogglePin(LD1_GPIO_Port, LD1_Pin);
 	}
 
 	if (htim == &htim4)
@@ -896,8 +950,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			uint8_t tx[] = "HAL_TIM_PeriodElapsedCallback() - TIM4\r\n";
 			HAL_UART_Transmit(&huart3, tx, sizeof(tx), 100);
 		}
-
-		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 	}
 	if (htim == &htim5)
 	{
@@ -905,8 +957,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			uint8_t tx[] = "HAL_TIM_PeriodElapsedCallback() - TIM5\r\n";
 			HAL_UART_Transmit(&huart3, tx, sizeof(tx), 100);
 		}
-
-		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 	}
 }
 /**
@@ -916,6 +966,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
  *         and get conversion result. You can add your own implementation.
  * @retval None
  */
+/*
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
 	uint32_t new_TimeStamp = htim5.Instance->CNT;
@@ -931,7 +982,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 	}
 
 }
-
+*/
 /**
  * @brief  Conversion DMA half-transfer callback in non blocking mode
  * @param  hadc: ADC handle
@@ -960,8 +1011,34 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
 void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
 {
 	{
+		const char *ers[] =	{
+				"No error",
+				"ADC IP internal error: if problem of clocking, enable/disable, erroneous state",
+				"Overrun error",
+				"DMA transfer error",
+				"Invalid Callback error"
+		};
+
+		uint32_t error_code =  HAL_ADC_GetError(hadc);
+
+		char erm[120] = "ADC Error:";
+		if (error_code & HAL_ADC_ERROR_NONE)
+			sprintf(erm, "%s %s," ,erm, ers[0]);
+		if (error_code & HAL_ADC_ERROR_INTERNAL)
+			sprintf(erm, "%s %s," ,erm, ers[1]);
+		if (error_code & HAL_ADC_ERROR_OVR)
+			sprintf(erm, "%s %s," ,erm, ers[2]);
+		if (error_code & HAL_ADC_ERROR_DMA)
+			sprintf(erm, "%s %s," ,erm, ers[3]);
+		if (error_code & 0x10U) //HAL_ADC_ERROR_INVALID_CALLBACK)
+			sprintf(erm, "%s %s," ,erm, ers[3]);
+
 		uint8_t tx[] = "HAL_ADC_ErrorCallback()\r\n";
 		HAL_UART_Transmit(&huart3, tx, sizeof(tx), 100);
+
+		uint8_t txe[100];
+		sprintf(txe, "ADC Error 0x%X(%d): %s\r\nSR: 0x%X DMA ErrCode: 0x%X\r\n", error_code, error_code, erm, hadc->Instance->SR, hadc->DMA_Handle->ErrorCode);
+		HAL_UART_Transmit(&huart3, txe, strlen(txe), 100);
 	}
 }
 
@@ -996,13 +1073,18 @@ void HAL_SPI_TxRxHalfCpltCallback(SPI_HandleTypeDef *hspi)
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 {
 	{
-		const char *ers[] =
-		{ "No error", "MODF error", "CRC error", "OVR error", "FRE error", "DMA transfer error", "Error on RXNE/TXE/BSY/FTLVL/FRLVL Flag",
-				"Error during SPI Abort procedure" };
+		const char *ers[] =	{
+				"No error",
+				"MODF error",
+				"CRC error",
+				"OVR error",
+				"FRE error",
+				"DMA transfer error",
+				"Error on RXNE/TXE/BSY/FTLVL/FRLVL Flag",
+				"Error during SPI Abort procedure"
+		};
 
 		uint32_t error_code = HAL_SPI_GetError(hspi);
-
-		uint8_t eri = 0;
 
 		char erm[100] = "SPI Error:";
 		if (error_code & HAL_SPI_ERROR_NONE)
@@ -1027,8 +1109,6 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 
 		uint8_t txe[100];
 		sprintf(txe, "SPI Error 0x%X(%d): %s\r\nSR: 0x%X DMA ErrCode: 0x%X\r\n", error_code, error_code, erm, hspi->Instance->SR, hspi->hdmatx->ErrorCode);
-
-		error_code = HAL_SPI_ERROR_DMA;
 		HAL_UART_Transmit(&huart3, txe, strlen(txe), 100);
 	}
 }
